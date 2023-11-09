@@ -953,7 +953,8 @@ def main():
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
     # move model to GPU, enable channels last layout if set
-    model.cuda()
+    model.to('cpu')
+
     if args.channels_last:
         model = model.to(memory_format=torch.channels_last)
 
@@ -1105,7 +1106,7 @@ def main():
         else:
             checkpoint = torch.load(args.teacher_path, map_location="cpu")
         teacher_model.load_state_dict(checkpoint["model"])
-        teacher_model.cuda()
+        teacher_model.cpu()
         teacher_model.eval()
 
     # create the train and eval datasets
@@ -1158,8 +1159,10 @@ def main():
 
     # create data loaders w/ augmentation pipeiine
     train_interpolation = args.train_interpolation
+
     if args.no_aug or not train_interpolation:
         train_interpolation = data_config["interpolation"]
+
     loader_train = create_loader(
         dataset_train,
         input_size=data_config["input_size"],
@@ -1226,8 +1229,8 @@ def main():
             train_loss_fn = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
     else:
         train_loss_fn = nn.CrossEntropyLoss()
-    train_loss_fn = train_loss_fn.cuda()
-    validate_loss_fn = nn.CrossEntropyLoss().cuda()
+    train_loss_fn = train_loss_fn.cpu()
+    validate_loss_fn = nn.CrossEntropyLoss().cpu()
 
     # use distill loss wrapper, which returns base loss when distillation is disabled
     train_loss_fn = DistillationLoss(
@@ -1381,7 +1384,7 @@ def train_one_epoch(
         last_batch = batch_idx == last_idx
         data_time_m.update(time.time() - end)
         if not args.prefetcher:
-            input, target = input.cuda(), target.cuda()
+            input, target = input.cpu(), target.cpu()
             if mixup_fn is not None:
                 input, target = mixup_fn(input, target)
         if args.channels_last:
@@ -1498,8 +1501,8 @@ def validate(model, loader, loss_fn, args, amp_autocast=suppress, log_suffix="")
         for batch_idx, (input, target) in enumerate(loader):
             last_batch = batch_idx == last_idx
             if not args.prefetcher:
-                input = input.cuda()
-                target = target.cuda()
+                input = input.cpu()
+                target = target.cpu()
             if args.channels_last:
                 input = input.contiguous(memory_format=torch.channels_last)
 
